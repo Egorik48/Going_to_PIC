@@ -1,7 +1,9 @@
 import random
+import string
 import sys
 import os
 import filetype
+import pathlib
 
 from PyQt6.QtCore import QMimeData
 from PyQt6.QtGui import QImage
@@ -10,10 +12,13 @@ from PIL import Image
 
 import math
 
-from web.QMainUI import QMainUI
+from ui.QMainUI import QMainUI
+
+russian_letters = 'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
+letters = string.ascii_letters + russian_letters
 
 
-class MAIN_WINDOW(QWidget, QMainUI):
+class Main_Window(QWidget, QMainUI):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -25,45 +30,82 @@ class MAIN_WINDOW(QWidget, QMainUI):
         self.btn_copy.clicked.connect(self.share_it)
         self.btn_save.clicked.connect(self.save_image)
         self.btn_transcribe.clicked.connect(self.recognize)
+        self.btn_save_rec_file.clicked.connect(self.save_rec)
 
     def attach(self):
         self.f_name = QFileDialog.getOpenFileName(
-            self, 'Выбрать файл', '',
+            self, 'Выбрать файл', 'C:\\Users\\ser\\Downloads',
             'Все файлы (*);;Картинка (*.jpg);;Картинка (*.png);;')[0]
         if self.f_name:
             self.text_result.setText('Файл прикреплён!')
             self.text_result.setStyleSheet("color: green;")
             self.password.setText('')
+            self.btn_save_rec_file.setEnabled(False)
+            self.label_file.setText(
+                f'Прикреплённый файл: {(self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]
+                                       + '....' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1]}' if
+                len((self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0]) > 20 else
+                (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]
+                + '.' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1]
+            )
+
+            try:
+                img_for_show = Image.open(self.f_name)
+                img_for_show.thumbnail((731, 1000), Image.Resampling.LANCZOS)
+                img_for_show.save("thumbnail_pic.png")
+                self.textBrowser.setHtml(f"""<img src="thumbnail_pic.png"/>""")
+            except Exception:
+                self.textBrowser.setHtml(f"""<img src="img_for_show.png"/>""")
         return
 
     def create_pic(self):
-        if not self.f_name:
-            self.text_result.setText('Сначала прикрепите картинку!')
-            self.text_result.setStyleSheet("color: red;")
-            return
-
         if not self.password.text():
             self.text_result.setText('Введите пароль для кодировки!')
             self.text_result.setStyleSheet("color: red;")
             return
 
-        self.curr_password = self.password.text() # нужен для копирования сохранённой картинки
+        if len(self.password.text()) < 5:
+            self.text_result.setText('Слишком короткий пароль! (нужно ≥ 5 символов)')
+            self.text_result.setStyleSheet("color: red;")
+            return
+
+        if sum([int(i in letters) for i in self.password.text()]) < 3:
+            self.text_result.setText('В пароле должно ≥ 3 буквы!')
+            self.text_result.setStyleSheet("color: red;")
+            return
+
+        self.curr_password = self.password.text()  # нужен для копирования сохранённой картинки
         code = sum(list(map(lambda x: ord(x), self.password.text())))
 
-        with open(self.f_name, 'rb') as f:
-            raw_byte = list(f.read())
-            f.close()
+        if self.radio_file.isChecked():
+            if not self.f_name:
+                self.text_result.setText('Сначала прикрепите файл!')
+                self.text_result.setStyleSheet("color: red;")
+                return
+
+            with open(self.f_name, 'rb') as f:
+                raw_byte = list(f.read())
+                f.close()
+        elif self.radio_text.isChecked():
+            if not self.input_text.toPlainText().encode('utf-8').strip():
+                self.text_result.setText('Нельзя зашифровать пустоту!')
+                self.text_result.setStyleSheet("color: red;")
+                return
+            raw_byte = self.input_text.toPlainText().encode('utf-8')
 
         create_im = Image.new('RGB', (731, y0 := math.ceil(len(raw_byte) / 731)), color='white')
         pixels = create_im.load()
+        count_pix = 731 * y0
         c = 0
         for x in range(731):
             for y in range(y0):
                 try:
                     pixels[x, y] = (random.randint(0, 255), (code - raw_byte[c]) % 256, (code - raw_byte[c]) // 256)
-                    c += 1
                 except IndexError:
                     pixels[x, y] = (0, 0, 0)
+
+                self.progress.setValue(int(round(c / count_pix, 2) * 100))
+                c += 1
         create_im.save('created_image.png')
         self.text_result.setText('Файл зашифрован!')
         self.text_result.setStyleSheet("color: violet;")
@@ -117,27 +159,29 @@ class MAIN_WINDOW(QWidget, QMainUI):
         code = sum(list(map(lambda x: ord(x), self.password.text())))
         for x in range(x0):
             for y in range(y0):
-                if  pixels[x, y] != (0, 0, 0):
+                if pixels[x, y] != (0, 0, 0):
                     raw_bytes.append(
                         code - ((pixels[x, y][2] * 256) + pixels[x, y][1])
                     )
 
         global type_file
+        raw_bytes = bytes(raw_bytes)
+        type_file = filetype.guess(raw_bytes).extension if filetype.guess(raw_bytes) else 'txt'
 
         try:
-            raw_bytes = bytes(raw_bytes)
-            type_file = filetype.guess(raw_bytes).extension
             with open(f'rec_im.{type_file}', 'wb') as f:
                 f.write(raw_bytes)
                 f.close()
-            QMessageBox.information(self, "Ура!", "Получилось!")
-        except ValueError:
-            QMessageBox.information(self, "Что-то пошло не по плану...", "Убедитесь, что у вас правильный пароль или картинка")
+            QMessageBox.information(self, "Ура!", "Расшифровали!")
 
+            if type_file == 'txt':
+                self.input_text.setPlainText(raw_bytes.decode('utf-8'))
 
+            self.btn_save_rec_file.setEnabled(True)
 
-
-
+        except (ValueError, AttributeError, Exception):
+            QMessageBox.information(self, "Что-то пошло не по плану...",
+                                    "Убедитесь, что у вас правильный пароль или картинка")
 
     def save_image(self):
         image = QImage('created_image.png')
@@ -156,7 +200,22 @@ class MAIN_WINDOW(QWidget, QMainUI):
             self.text_result.setText('Картинка сохранена!')
             self.text_result.setStyleSheet('color: violet;')
 
+    def save_rec(self):
+        fname, _ = QFileDialog.getSaveFileName(
+            self,
+            'Сохранить файл',
+            f'C://Users//user//Downloads//new_file.{type_file}',
+            f'Разрешение (*.{type_file})'
+        )
 
+        if fname:
+            dir, name = fname.rsplit('/', 1)
+            os.rename(f'rec_im.{type_file}', name)
+            file_from = pathlib.Path(name)
+            file_to = pathlib.Path(dir)
+            file_from.copy_into(file_to)
+            self.text_result.setText('Сохранено!')
+            self.text_result.setStyleSheet('color: violet;')
 
 
 def except_hook(cls, exception, traceback):
@@ -164,12 +223,12 @@ def except_hook(cls, exception, traceback):
 
 
 def cleanup():
-    try:
-        os.remove('created_image.png')
-        os.remove(f'rec_im.{type_file}')
-    except FileNotFoundError:
-        pass
-
+    remove_list = ['created_image.png', f'rec_im.{type_file}', 'thumbnail_pic.png']
+    for item in remove_list:
+        try:
+            os.remove(item)
+        except FileNotFoundError:
+            pass
 
 
 if __name__ == '__main__':
@@ -178,9 +237,7 @@ if __name__ == '__main__':
 
     app.aboutToQuit.connect(cleanup)
 
-    ex = MAIN_WINDOW()
+    ex = Main_Window()
     ex.show()
 
     sys.exit(app.exec())
-
-
