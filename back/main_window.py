@@ -7,7 +7,7 @@ import filetype
 import pathlib
 
 from PyQt6.QtCore import QMimeData
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QWidget, QFileDialog, QApplication, QMessageBox
 from PIL import Image, UnidentifiedImageError
 
@@ -26,6 +26,10 @@ class MainWindow(QWidget, QMainUI):
         self.setupUi(self)
         self.f_name = ''
         self.curr_password = ''
+
+        pixmap = QPixmap('fun_pic.jpg')
+        self.pic_for_fun.setPixmap(pixmap)
+        self.pic_for_fun.setScaledContents(True)
 
         self.btn_create.clicked.connect(self.create_pic)
         self.btn_attach.clicked.connect(self.attach)
