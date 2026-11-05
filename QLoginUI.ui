@@ -159,6 +159,24 @@
     </item>
    </layout>
   </widget>
+  <widget class="QPushButton" name="btn_forget_password">
+   <property name="geometry">
+    <rect>
+     <x>490</x>
+     <y>20</y>
+     <width>241</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>19</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Забыл пароль</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>

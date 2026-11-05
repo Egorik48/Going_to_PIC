@@ -222,7 +222,7 @@
     <rect>
      <x>1480</x>
      <y>120</y>
-     <width>371</width>
+     <width>420</width>
      <height>361</height>
     </rect>
    </property>
@@ -247,7 +247,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Скопировать картинку</string>
+       <string>Скопировать картинку и пароль</string>
       </property>
      </widget>
     </item>

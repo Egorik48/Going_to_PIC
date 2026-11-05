@@ -85,6 +85,12 @@ class QLoginUI(object):
         self.btn_enter.setFont(font)
         self.btn_enter.setObjectName("btn_enter")
         self.horizontalLayout.addWidget(self.btn_enter)
+        self.btn_forget_password = QtWidgets.QPushButton(parent=Form)
+        self.btn_forget_password.setGeometry(QtCore.QRect(490, 20, 241, 51))
+        font = QtGui.QFont()
+        font.setPointSize(19)
+        self.btn_forget_password.setFont(font)
+        self.btn_forget_password.setObjectName("btn_forget_password")
 
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
@@ -97,3 +103,4 @@ class QLoginUI(object):
         self.label_3.setText(_translate("Form", "Добро пожаловать!"))
         self.btn_reg.setText(_translate("Form", "Регистрация"))
         self.btn_enter.setText(_translate("Form", "Вход"))
+        self.btn_forget_password.setText(_translate("Form", "Забыл пароль"))

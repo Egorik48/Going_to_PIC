@@ -1,4 +1,5 @@
 import random
+import sqlite3
 import string
 import sys
 import os
@@ -8,7 +9,7 @@ import pathlib
 from PyQt6.QtCore import QMimeData
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QWidget, QFileDialog, QApplication, QMessageBox
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 import math
 
@@ -17,10 +18,11 @@ from ui.QMainUI import QMainUI
 russian_letters = 'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
 letters = string.ascii_letters + russian_letters
 
-
-class Main_Window(QWidget, QMainUI):
-    def __init__(self):
+global login
+class MainWindow(QWidget, QMainUI):
+    def __init__(self, us_login):
         super().__init__()
+        self.us_login = us_login
         self.setupUi(self)
         self.f_name = ''
         self.curr_password = ''
@@ -30,7 +32,7 @@ class Main_Window(QWidget, QMainUI):
         self.btn_copy.clicked.connect(self.share_it)
         self.btn_save.clicked.connect(self.save_image)
         self.btn_transcribe.clicked.connect(self.recognize)
-        self.btn_save_rec_file.clicked.connect(self.save_rec)
+        self.save_rec_file.clicked.connect(self.save_rec)
 
     def attach(self):
         self.f_name = QFileDialog.getOpenFileName(
@@ -43,9 +45,9 @@ class Main_Window(QWidget, QMainUI):
             self.btn_save_rec_file.setEnabled(False)
             self.label_file.setText(
                 f'Прикреплённый файл: {(self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]
-                                       + '....' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1]}' if
+                                       + '....' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1] if
                 len((self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0]) > 20 else
-                (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]
+                (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]}'
                 + '.' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1]
             )
 
@@ -54,7 +56,7 @@ class Main_Window(QWidget, QMainUI):
                 img_for_show.thumbnail((731, 1000), Image.Resampling.LANCZOS)
                 img_for_show.save("thumbnail_pic.png")
                 self.textBrowser.setHtml(f"""<img src="thumbnail_pic.png"/>""")
-            except Exception:
+            except UnidentifiedImageError:
                 self.textBrowser.setHtml(f"""<img src="img_for_show.png"/>""")
         return
 
@@ -85,7 +87,7 @@ class Main_Window(QWidget, QMainUI):
 
             with open(self.f_name, 'rb') as f:
                 raw_byte = list(f.read())
-                f.close()
+
         elif self.radio_text.isChecked():
             if not self.input_text.toPlainText().encode('utf-8').strip():
                 self.text_result.setText('Нельзя зашифровать пустоту!')
@@ -171,7 +173,7 @@ class Main_Window(QWidget, QMainUI):
         try:
             with open(f'rec_im.{type_file}', 'wb') as f:
                 f.write(raw_bytes)
-                f.close()
+
             QMessageBox.information(self, "Ура!", "Расшифровали!")
 
             if type_file == 'txt':
@@ -217,9 +219,14 @@ class Main_Window(QWidget, QMainUI):
             self.text_result.setText('Сохранено!')
             self.text_result.setStyleSheet('color: violet;')
 
-
-def except_hook(cls, exception, traceback):
-    sys.__excepthook__(cls, exception, traceback)
+    def exit_on_db(self):
+        con = sqlite3.connect('users.sqlite')
+        cur = con.cursor()
+        cur.execute(f"""UPDATE data_users
+         SET active = (SELECT type FROM actives WHERE title == 'не в приложении')
+         WHERE login = {self.us_login}""") # хз не знаю почему не работает
+        con.commit()
+        con.close()
 
 
 def cleanup():
@@ -231,13 +238,18 @@ def cleanup():
             pass
 
 
+
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     sys.excepthook = except_hook
 
-    app.aboutToQuit.connect(cleanup)
+    app.aboutToQuit.connect(lambda:cleanup, MainWindow.exit_on_db)
 
-    ex = Main_Window()
+    ex = MainWindow()
     ex.show()
 
     sys.exit(app.exec())
