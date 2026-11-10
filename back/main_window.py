@@ -255,13 +255,5 @@ def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    sys.excepthook = except_hook
 
-    app.aboutToQuit.connect(lambda: cleanup, MainWindow.exit_on_db)
-
-    ex = MainWindow()  # удлить нахуй
-    ex.show()
-
-    sys.exit(app.exec())
+sys.excepthook = except_hook

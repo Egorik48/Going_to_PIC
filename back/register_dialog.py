@@ -84,10 +84,12 @@ class RegisterWindow(QWidget, QRegisterUI):
                                                      f' для восстановления, вот он: {secret}, не беспокойся, он уже у'
                                                      f' тебя в буфере обмена, сохрани его куда-нибудь.')
         from main_window import MainWindow
+        import main_window as mw
         self.main = MainWindow(self.login.text())
         self.main.show()
-
         self.close()
+        self.main.exit_on_db()
+        mw.cleanup()
 
     def go_login(self):
         from login_window import LoginWindow

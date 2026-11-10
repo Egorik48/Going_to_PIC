@@ -2,7 +2,7 @@ import sqlite3
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QLineEdit
+from PyQt6.QtWidgets import QWidget, QMessageBox, QLineEdit
 
 from ui.QLoginUI import QLoginUI
 
@@ -37,10 +37,14 @@ class LoginWindow(QWidget, QLoginUI):
         QMessageBox.information(self, 'Успех!', 'Добро пожаловать!')
 
         from main_window import MainWindow
+        import main_window as mw
         self.main = MainWindow(self.login.text())
         self.main.show()
-
         self.close()
+        self.main.exit_on_db()
+        mw.cleanup()
+
+
 
     def go_register(self):
         from register_dialog import RegisterWindow
@@ -62,11 +66,5 @@ def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    sys.excepthook = except_hook
 
-    ex = LoginWindow()
-    ex.show()
-
-    sys.exit(app.exec())
+sys.excepthook = except_hook

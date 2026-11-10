@@ -31,7 +31,7 @@ class _ResponsiveScaler(QtCore.QObject):
             if parent_layout is not None and parent_layout.indexOf(widget) >= 0:
                 continue
 
-            self._widget_geometries.append((widget, widget.geometry()))
+            self._widget_geometries.append((widget, widget.geometry()))  # widget.geometry() - x, y, длина, ширина
 
         # Запоминаем параметры layout, чтобы пропорционально менять отступы.
         self._layouts = []
@@ -39,17 +39,27 @@ class _ResponsiveScaler(QtCore.QObject):
         for widget in widgets_with_layouts:
             layout = widget.layout()
             if layout is not None:
-                self._layouts.append((layout, layout.contentsMargins(), layout.spacing()))
+                self._layouts.append((layout, layout.contentsMargins(), layout.spacing()))  # layout.contentsMargins()
+                # - внутренние отступы слева, сверху, справа и снизу.
+                # layout.spacing() - расстояние между элементами
 
-        root.installEventFilter(self)
+        root.installEventFilter(self)  # фильтр событий на главное окно
 
-    def eventFilter(self, watched, event):
+    def eventFilter(self, watched, event):  # евент при изменении размера окна
         if watched is self._root and event.type() == QtCore.QEvent.Type.Resize:
+            # Проверяем, что событие пришло именно от нашего главного окна и что тип события - Resize,
+            # то есть изменение размера объекта
             self.apply()
-        return super().eventFilter(watched, event)
+        return super().eventFilter(watched, event)  # если это событие не изменения размера окна,
+        # то просто будем передавать его дальше стандартной системе обработки событий
 
     def apply(self):
         if self._updating:
+            '''Вызвалась функция apply().
+Программа изменила геометрию виджетов.
+Изменение геометрии может вызвать дополнительные события Qt.
+Чтобы повторные вызовы не начинали новое масштабирование одновременно с уже выполняющимся, мы используем защиту через 
+_updating.'''
             return
 
         self._updating = True
@@ -57,8 +67,8 @@ class _ResponsiveScaler(QtCore.QObject):
             width = max(1, self._root.width())
             height = max(1, self._root.height())
 
-            # Не увеличиваем интерфейс выше исходного размера 1920x1080.
-            scale = min(width / self._base_width, height / self._base_height, 1.0)
+            scale = min(width / self._base_width, height / self._base_height, 1.0)  # 1.0 не позволяет увеличивать
+            # интерфейс больше первоначального размера
             offset_x = (width - self._base_width * scale) / 2
             offset_y = (height - self._base_height * scale) / 2
 
@@ -72,7 +82,7 @@ class _ResponsiveScaler(QtCore.QObject):
                     round(original_geometry.y() * scale + y_offset),
                     max(1, round(original_geometry.width() * scale)),
                     max(1, round(original_geometry.height() * scale)),
-                )
+                )  # x, y, ширина, высота
 
             for layout, margins, spacing in self._layouts:
                 layout.setContentsMargins(
@@ -81,7 +91,8 @@ class _ResponsiveScaler(QtCore.QObject):
                     round(margins.right() * scale),
                     round(margins.bottom() * scale),
                 )
-                layout.setSpacing(round(spacing * scale) if spacing >= 0 else -1)
+                layout.setSpacing(round(spacing * scale) if spacing >= 0 else -1)  # Изменяем расстояние между
+                # элементами layout. -1 означает использование стандартного интервала.
         finally:
             self._updating = False
 
@@ -90,7 +101,8 @@ class QMainUI(object):
     def setupUi(self, QMainUI):
         QMainUI.setObjectName("QMainUI")
         QMainUI.resize(1920, 1080)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
+                                           QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(QMainUI.sizePolicy().hasHeightForWidth())
@@ -118,7 +130,8 @@ class QMainUI(object):
         self.label_3.setFont(font)
         self.label_3.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.label_3.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.label_3.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignTop)
+        self.label_3.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignLeading | QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         self.label_3.setWordWrap(False)
         self.label_3.setObjectName("label_3")
         self.progress = QtWidgets.QProgressBar(parent=QMainUI)
@@ -176,7 +189,7 @@ class QMainUI(object):
         self.verticalLayout.addWidget(self.btn_attach)
         self.btn_copy = QtWidgets.QPushButton(parent=self.verticalLayoutWidget)
         font = QtGui.QFont()
-        font.setPointSize(20)
+        font.setPointSize(18)
         self.btn_copy.setFont(font)
         self.btn_copy.setObjectName("btn_copy")
         self.verticalLayout.addWidget(self.btn_copy)
@@ -250,24 +263,23 @@ class QMainUI(object):
         self._responsive_scaler = _ResponsiveScaler(QMainUI)
 
         # При запуске стараемся сразу уместить окно на текущем экране.
-        screen = QtWidgets.QApplication.primaryScreen()
+        screen = QtWidgets.QApplication.primaryScreen()  # основной монитор
         if screen is not None:
-            available_geometry = screen.availableGeometry()
-            available_width = max(640, available_geometry.width() - 40)
-            available_height = max(360, available_geometry.height() - 80)
+            available_geometry = screen.availableGeometry()  # Получаем доступную геометрию экрана
+            available_width = max(640, available_geometry.width() - 40)  # Оставляем небольшой запас в 40 пикселей
+            available_height = max(360, available_geometry.height() - 80)  # Оставляем небольшой запас в 80 пикселей
             initial_scale = min(
                 1.0,
                 available_width / 1920,
                 available_height / 1080,
-            )
+            )  # Вычисляем коэффициент первоначального масштабирования окна
             initial_width = max(640, round(1920 * initial_scale))
             initial_height = max(360, round(1080 * initial_scale))
             QMainUI.resize(initial_width, initial_height)
-            if QMainUI.isWindow():
-                QMainUI.move(
-                    available_geometry.x() + (available_geometry.width() - initial_width) // 2,
-                    available_geometry.y() + (available_geometry.height() - initial_height) // 2,
-                )
+            QMainUI.move(
+                available_geometry.x() + (available_geometry.width() - initial_width) // 2,
+                available_geometry.y() + (available_geometry.height() - initial_height) // 2,
+            )  # перемещаем окно в центр
 
         self._responsive_scaler.apply()
 
