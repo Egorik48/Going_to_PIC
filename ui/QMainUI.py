@@ -9,15 +9,93 @@
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 
+class _ResponsiveScaler(QtCore.QObject):
+    """Масштабирует расположение и размеры виджетов под размер окна."""
+
+    def __init__(self, root, base_width=1920, base_height=1080):
+        super().__init__(root)
+        self._root = root
+        self._base_width = base_width
+        self._base_height = base_height
+        self._updating = False
+
+        # Запоминаем исходную геометрию всех виджетов.
+        # Элементы, которыми управляет layout, он сам подстроит под новый размер.
+        self._widget_geometries = []
+        for widget in root.findChildren(QtWidgets.QWidget):
+            parent = widget.parentWidget()
+            if parent is None:
+                continue
+
+            parent_layout = parent.layout()
+            if parent_layout is not None and parent_layout.indexOf(widget) >= 0:
+                continue
+
+            self._widget_geometries.append((widget, widget.geometry()))
+
+        # Запоминаем параметры layout, чтобы пропорционально менять отступы.
+        self._layouts = []
+        widgets_with_layouts = [root] + root.findChildren(QtWidgets.QWidget)
+        for widget in widgets_with_layouts:
+            layout = widget.layout()
+            if layout is not None:
+                self._layouts.append((layout, layout.contentsMargins(), layout.spacing()))
+
+        root.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if watched is self._root and event.type() == QtCore.QEvent.Type.Resize:
+            self.apply()
+        return super().eventFilter(watched, event)
+
+    def apply(self):
+        if self._updating:
+            return
+
+        self._updating = True
+        try:
+            width = max(1, self._root.width())
+            height = max(1, self._root.height())
+
+            # Не увеличиваем интерфейс выше исходного размера 1920x1080.
+            scale = min(width / self._base_width, height / self._base_height, 1.0)
+            offset_x = (width - self._base_width * scale) / 2
+            offset_y = (height - self._base_height * scale) / 2
+
+            for widget, original_geometry in self._widget_geometries:
+                parent = widget.parentWidget()
+                x_offset = offset_x if parent is self._root else 0
+                y_offset = offset_y if parent is self._root else 0
+
+                widget.setGeometry(
+                    round(original_geometry.x() * scale + x_offset),
+                    round(original_geometry.y() * scale + y_offset),
+                    max(1, round(original_geometry.width() * scale)),
+                    max(1, round(original_geometry.height() * scale)),
+                )
+
+            for layout, margins, spacing in self._layouts:
+                layout.setContentsMargins(
+                    round(margins.left() * scale),
+                    round(margins.top() * scale),
+                    round(margins.right() * scale),
+                    round(margins.bottom() * scale),
+                )
+                layout.setSpacing(round(spacing * scale) if spacing >= 0 else -1)
+        finally:
+            self._updating = False
+
+
 class QMainUI(object):
     def setupUi(self, QMainUI):
         QMainUI.setObjectName("QMainUI")
         QMainUI.resize(1920, 1080)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(QMainUI.sizePolicy().hasHeightForWidth())
         QMainUI.setSizePolicy(sizePolicy)
+        QMainUI.setMinimumSize(640, 360)
         self.input_text = QtWidgets.QPlainTextEdit(parent=QMainUI)
         self.input_text.setGeometry(QtCore.QRect(40, 150, 391, 351))
         self.input_text.setObjectName("input_text")
@@ -135,61 +213,63 @@ class QMainUI(object):
         self.label_file = QtWidgets.QLabel(parent=QMainUI)
         self.label_file.setGeometry(QtCore.QRect(1480, 50, 421, 41))
         self.label_file.setObjectName("label_file")
-        self.radio_file = QtWidgets.QRadioButton(parent=QMainUI)
-        self.radio_file.setGeometry(QtCore.QRect(160, 830, 115, 24))
+        self.frame = QtWidgets.QFrame(parent=QMainUI)
+        self.frame.setGeometry(QtCore.QRect(80, 730, 331, 221))
+        self.frame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.frame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.frame.setObjectName("frame")
+        self.label_8 = QtWidgets.QLabel(parent=self.frame)
+        self.label_8.setGeometry(QtCore.QRect(70, 40, 181, 61))
+        font = QtGui.QFont()
+        font.setPointSize(20)
+        self.label_8.setFont(font)
+        self.label_8.setObjectName("label_8")
+        self.radio_text = QtWidgets.QRadioButton(parent=self.frame)
+        self.radio_text.setGeometry(QtCore.QRect(100, 160, 111, 31))
+        font = QtGui.QFont()
+        font.setPointSize(18)
+        self.radio_text.setFont(font)
+        self.radio_text.setObjectName("radio_text")
+        self.buttonGroup = QtWidgets.QButtonGroup(QMainUI)
+        self.buttonGroup.setObjectName("buttonGroup")
+        self.buttonGroup.addButton(self.radio_text)
+        self.radio_file = QtWidgets.QRadioButton(parent=self.frame)
+        self.radio_file.setGeometry(QtCore.QRect(100, 120, 115, 24))
         font = QtGui.QFont()
         font.setPointSize(18)
         self.radio_file.setFont(font)
         self.radio_file.setChecked(True)
         self.radio_file.setAutoRepeat(False)
         self.radio_file.setObjectName("radio_file")
-        self.buttonGroup = QtWidgets.QButtonGroup(QMainUI)
-        self.buttonGroup.setObjectName("buttonGroup")
         self.buttonGroup.addButton(self.radio_file)
-        self.radio_text = QtWidgets.QRadioButton(parent=QMainUI)
-        self.radio_text.setGeometry(QtCore.QRect(160, 870, 111, 31))
-        font = QtGui.QFont()
-        font.setPointSize(18)
-        self.radio_text.setFont(font)
-        self.radio_text.setObjectName("radio_text")
-        self.buttonGroup.addButton(self.radio_text)
-        self.label_8 = QtWidgets.QLabel(parent=QMainUI)
-        self.label_8.setGeometry(QtCore.QRect(130, 750, 181, 61))
-        font = QtGui.QFont()
-        font.setPointSize(20)
-        self.label_8.setFont(font)
-        self.label_8.setObjectName("label_8")
-        self.label_9 = QtWidgets.QLabel(parent=QMainUI)
-        self.label_9.setEnabled(False)
-        self.label_9.setGeometry(QtCore.QRect(50, 720, 351, 241))
-        self.label_9.setAutoFillBackground(True)
-        self.label_9.setText("")
-        self.label_9.setObjectName("label_9")
-        self.label_9.raise_()
-        self.input_text.raise_()
-        self.label.raise_()
-        self.label_2.raise_()
-        self.label_3.raise_()
-        self.progress.raise_()
-        self.label_4.raise_()
-        self.label_5.raise_()
-        self.label_6.raise_()
-        self.text_result.raise_()
-        self.textBrowser.raise_()
-        self.btn_create.raise_()
-        self.verticalLayoutWidget.raise_()
-        self.pic_for_fun.raise_()
-        self.btn_transcribe.raise_()
-        self.password.raise_()
-        self.label_7.raise_()
-        self.save_rec_file.raise_()
-        self.label_file.raise_()
-        self.radio_file.raise_()
-        self.radio_text.raise_()
-        self.label_8.raise_()
 
         self.retranslateUi(QMainUI)
         QtCore.QMetaObject.connectSlotsByName(QMainUI)
+
+        # Автоматическое масштабирование при изменении размера окна.
+        self._responsive_scaler = _ResponsiveScaler(QMainUI)
+
+        # При запуске стараемся сразу уместить окно на текущем экране.
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            available_geometry = screen.availableGeometry()
+            available_width = max(640, available_geometry.width() - 40)
+            available_height = max(360, available_geometry.height() - 80)
+            initial_scale = min(
+                1.0,
+                available_width / 1920,
+                available_height / 1080,
+            )
+            initial_width = max(640, round(1920 * initial_scale))
+            initial_height = max(360, round(1080 * initial_scale))
+            QMainUI.resize(initial_width, initial_height)
+            if QMainUI.isWindow():
+                QMainUI.move(
+                    available_geometry.x() + (available_geometry.width() - initial_width) // 2,
+                    available_geometry.y() + (available_geometry.height() - initial_height) // 2,
+                )
+
+        self._responsive_scaler.apply()
 
     def retranslateUi(self, QMainUI):
         _translate = QtCore.QCoreApplication.translate
@@ -208,6 +288,6 @@ class QMainUI(object):
         self.label_7.setText(_translate("QMainUI", "Пароль:"))
         self.save_rec_file.setText(_translate("QMainUI", "Сохранить расшифрованый файл"))
         self.label_file.setText(_translate("QMainUI", "Приреплённый файл:"))
-        self.radio_file.setText(_translate("QMainUI", "файл"))
-        self.radio_text.setText(_translate("QMainUI", "текст"))
         self.label_8.setText(_translate("QMainUI", "Что шифруем?"))
+        self.radio_text.setText(_translate("QMainUI", "текст"))
+        self.radio_file.setText(_translate("QMainUI", "файл"))

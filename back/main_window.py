@@ -18,7 +18,7 @@ from ui.QMainUI import QMainUI
 russian_letters = 'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
 letters = string.ascii_letters + russian_letters
 
-global login
+
 class MainWindow(QWidget, QMainUI):
     def __init__(self, us_login):
         super().__init__()
@@ -46,7 +46,7 @@ class MainWindow(QWidget, QMainUI):
             self.text_result.setText('Файл прикреплён!')
             self.text_result.setStyleSheet("color: green;")
             self.password.setText('')
-            self.btn_save_rec_file.setEnabled(False)
+            self.save_rec_file.setEnabled(False)
             self.label_file.setText(
                 f'Прикреплённый файл: {(self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[0][:20]
                                        + '....' + (self.f_name.rsplit('/', 1)[-1]).rsplit('.', 1)[1] if
@@ -99,9 +99,18 @@ class MainWindow(QWidget, QMainUI):
                 return
             raw_byte = self.input_text.toPlainText().encode('utf-8')
 
+        # Защита от ошибки (DecompressionBombWarning: Image size (n pixels) exceeds limit of 89478485 pixels,
+        # could be decompression bomb DOS attack.)
+        if 731 * math.ceil(len(raw_byte) / 731) > 89478485:
+            QMessageBox.warning(self, 'Много!', 'У ваш файл весит слишком много,'
+                                                ' просим прощёния за доставленные неудобства.'
+                                                ' Прикрепите файл поменьше!')
+            return
+
         create_im = Image.new('RGB', (731, y0 := math.ceil(len(raw_byte) / 731)), color='white')
         pixels = create_im.load()
         count_pix = 731 * y0
+
         c = 0
         for x in range(731):
             for y in range(y0):
@@ -183,7 +192,7 @@ class MainWindow(QWidget, QMainUI):
             if type_file == 'txt':
                 self.input_text.setPlainText(raw_bytes.decode('utf-8'))
 
-            self.btn_save_rec_file.setEnabled(True)
+            self.save_rec_file.setEnabled(True)
 
         except (ValueError, AttributeError, Exception):
             QMessageBox.information(self, "Что-то пошло не по плану...",
@@ -228,7 +237,7 @@ class MainWindow(QWidget, QMainUI):
         cur = con.cursor()
         cur.execute(f"""UPDATE data_users
          SET active = (SELECT type FROM actives WHERE title == 'не в приложении')
-         WHERE login = {self.us_login}""") # хз не знаю почему не работает
+         WHERE login = ?""", (self.us_login,))  # хз не знаю почему не работает
         con.commit()
         con.close()
 
@@ -242,7 +251,6 @@ def cleanup():
             pass
 
 
-
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
@@ -251,9 +259,9 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     sys.excepthook = except_hook
 
-    app.aboutToQuit.connect(lambda:cleanup, MainWindow.exit_on_db)
+    app.aboutToQuit.connect(lambda: cleanup, MainWindow.exit_on_db)
 
-    ex = MainWindow()
+    ex = MainWindow()  # удлить нахуй
     ex.show()
 
     sys.exit(app.exec())

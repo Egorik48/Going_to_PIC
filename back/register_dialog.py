@@ -1,6 +1,7 @@
 import random
 import sys
 import sqlite3
+import string
 
 from PyQt6 import QtCore, QtMultimedia
 from PyQt6.QtCore import QMimeData, Qt
@@ -45,8 +46,8 @@ class RegisterWindow(QWidget, QRegisterUI):
             self.text_error.setText('Пароль должен содержать ≥ 1 заглавную букву!')
             return
 
-        if not any(i in '+=_-()<>&*$' for i in self.password_first.text()):
-            self.text_error.setText('Пароль должен содержать ≥ 1 спец. символ! (+=_-()<>&*$)')
+        if not any(i in string.punctuation for i in self.password_first.text()):
+            self.text_error.setText('Пароль должен содержать ≥ 1 спец. символ!')
             return
 
         connection = sqlite3.connect('users.sqlite')
