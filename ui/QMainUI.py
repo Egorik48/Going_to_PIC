@@ -24,18 +24,16 @@ class _ResponsiveScaler(QtCore.QObject):
         self._widget_geometries = []
         for widget in root.findChildren(QtWidgets.QWidget):
             parent = widget.parentWidget()
-            if parent is None:
-                continue
-
             parent_layout = parent.layout()
             if parent_layout is not None and parent_layout.indexOf(widget) >= 0:
+                # Если виджет находится в layout, то пропускаем
                 continue
 
             self._widget_geometries.append((widget, widget.geometry()))  # widget.geometry() - x, y, длина, ширина
 
         # Запоминаем параметры layout, чтобы пропорционально менять отступы.
         self._layouts = []
-        widgets_with_layouts = [root] + root.findChildren(QtWidgets.QWidget)
+        widgets_with_layouts = root.findChildren(QtWidgets.QWidget) # список всех виджетов, у которых может быть свой layout
         for widget in widgets_with_layouts:
             layout = widget.layout()
             if layout is not None:
@@ -43,7 +41,7 @@ class _ResponsiveScaler(QtCore.QObject):
                 # - внутренние отступы слева, сверху, справа и снизу.
                 # layout.spacing() - расстояние между элементами
 
-        root.installEventFilter(self)  # фильтр событий на главное окно
+        root.installEventFilter(self)  # прежде чем главное окно обработает событие, сначала оно передаётся методу eventFilter()
 
     def eventFilter(self, watched, event):  # евент при изменении размера окна
         if watched is self._root and event.type() == QtCore.QEvent.Type.Resize:
@@ -76,6 +74,7 @@ _updating.'''
                 parent = widget.parentWidget()
                 x_offset = offset_x if parent is self._root else 0
                 y_offset = offset_y if parent is self._root else 0
+                # Сдвиг применяется только к виджетам, которые лежат в главном окне.
 
                 widget.setGeometry(
                     round(original_geometry.x() * scale + x_offset),
@@ -84,6 +83,7 @@ _updating.'''
                     max(1, round(original_geometry.height() * scale)),
                 )  # x, y, ширина, высота
 
+            # Масштабирование layout
             for layout, margins, spacing in self._layouts:
                 layout.setContentsMargins(
                     round(margins.left() * scale),
@@ -91,8 +91,9 @@ _updating.'''
                     round(margins.right() * scale),
                     round(margins.bottom() * scale),
                 )
-                layout.setSpacing(round(spacing * scale) if spacing >= 0 else -1)  # Изменяем расстояние между
-                # элементами layout. -1 означает использование стандартного интервала.
+                layout.setSpacing(round(spacing * scale) if spacing >= 0 else -1)
+                # уменьшаются внутренние отступы, уменьшается расстояние между элементами.
+                # проверка нужна, если layout использует автоматический spacing, а не конкретное число.
         finally:
             self._updating = False
 
@@ -266,8 +267,8 @@ class QMainUI(object):
         screen = QtWidgets.QApplication.primaryScreen()  # основной монитор
         if screen is not None:
             available_geometry = screen.availableGeometry()  # Получаем доступную геометрию экрана
-            available_width = max(640, available_geometry.width() - 40)  # Оставляем небольшой запас в 40 пикселей
-            available_height = max(360, available_geometry.height() - 80)  # Оставляем небольшой запас в 80 пикселей
+            available_width = max(640, available_geometry.width() - 20)  # Оставляем небольшой запас в 20 пикселей
+            available_height = max(360, available_geometry.height() - 40)  # Оставляем небольшой запас в 40 пикселей
             initial_scale = min(
                 1.0,
                 available_width / 1920,

@@ -5,7 +5,7 @@ import string
 
 from PyQt6 import QtCore, QtMultimedia
 from PyQt6.QtCore import QMimeData, Qt
-from PyQt6.QtWidgets import QWidget, QApplication, QLineEdit, QMessageBox
+from PyQt6.QtWidgets import QWidget, QApplication, QLineEdit, QMessageBox, QInputDialog, QPushButton, QDialogButtonBox
 
 from ui.QRegisterUI import QRegisterUI
 
@@ -52,21 +52,27 @@ class RegisterWindow(QWidget, QRegisterUI):
 
         connection = sqlite3.connect('users.sqlite')
         cursor = connection.cursor()
-        logins = cursor.execute('SELECT login FROM data_users').fetchall()
+        logins = cursor.execute('SELECT login, secret FROM data_users').fetchall()
+        secrets = cursor.execute('SELECT secret FROM data_users').fetchall()
         logins = [row[0] for row in logins]
+        secrets = [row[0] for row in secrets]
 
         if self.login.text() in logins:
             self.text_error.setText('Этот логин уже занят, поменяйте на другой.')
             return
 
-        secret = random.sample('qwertyuiop[]asdfghjkl;zxcvbnm,./1'
-                               '234567890-=ёйцукенгшщзъфывапролджэячсмитьбю.',
-                               10)  # нужно сделать проверку в бд, что он уникальный
-        secret = ''.join(secret)
-        mime_data = QMimeData()
-        mime_data.setText(secret)
+        while True:
+            secret = random.choices(
+                string.printable + 'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
+                , k=8)
+            secret = ''.join(secret)
+            if secret not in secrets:
+                break
 
-        QApplication.clipboard().setMimeData(mime_data)
+        #mime_data = QMimeData()
+        #mime_data.setText(secret)
+
+        #QApplication.clipboard().setMimeData(mime_data)
 
         cursor.execute(
             f"""INSERT INTO data_users (login, password, secret, active) 
@@ -79,10 +85,27 @@ class RegisterWindow(QWidget, QRegisterUI):
         self.player.play()
         self.text_error.setText('Получилось!')
         self.text_error.setStyleSheet('color: orange;')
-        QMessageBox.information(self, 'Зарегались!', f'Ты успешно прошёл регистрацию,'
-                                                     f' но если ты потеряешь пароль, то у тебя есть секретный ключ'
-                                                     f' для восстановления, вот он: {secret}, не беспокойся, он уже у'
-                                                     f' тебя в буфере обмена, сохрани его куда-нибудь.')
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle('Успешная регистрация!')
+        dialog.setLabelText('Если забудете пароль, то можете его восстановить используя секретный ключ:')
+        dialog.setTextEchoMode(QLineEdit.EchoMode.Normal)
+        dialog.setTextValue(secret)
+        dialog.show()
+
+        line_edit = dialog.findChild(QLineEdit)
+        line_edit.setReadOnly(True)
+
+        button_box = dialog.findChild(QDialogButtonBox)
+        ok_btn = button_box.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setText('Скопировать')
+        cancel_btn = button_box.button(QDialogButtonBox.StandardButton.Cancel)
+        cancel_btn.setText('Ок')
+        result = dialog.exec()
+
+        if result:
+            QApplication.clipboard().setText(dialog.textValue())
+            QMessageBox.information(self, 'Скопировано!', "Скопировано!")
+
         from main_window import MainWindow
         import main_window as mw
         self.main = MainWindow(self.login.text())
