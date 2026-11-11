@@ -1,24 +1,27 @@
+import datetime
 import random
 import sys
 import sqlite3
 import string
 
 from PyQt6 import QtCore, QtMultimedia
-from PyQt6.QtCore import QMimeData, Qt
-from PyQt6.QtWidgets import QWidget, QApplication, QLineEdit, QMessageBox, QInputDialog, QPushButton, QDialogButtonBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QApplication, QLineEdit, QMessageBox, QInputDialog, QDialogButtonBox
 
+import main_window
 from ui.QRegisterUI import QRegisterUI
 
 
 class RegisterWindow(QWidget, QRegisterUI):
-    def __init__(self, /):
+    def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.password_first.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_second.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_first.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
+        self.password_second.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
         self.text_error.setStyleSheet("color: red;")
         self.text_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # загружаю медиа файл и готовлю к воспроизведению
         self.media = QtCore.QUrl.fromLocalFile('end_reg.mp3')
         self.audio_output = QtMultimedia.QAudioOutput()
         self.audio_output.setVolume(1)
@@ -50,45 +53,50 @@ class RegisterWindow(QWidget, QRegisterUI):
             self.text_error.setText('Пароль должен содержать ≥ 1 спец. символ!')
             return
 
+        # выводим все логины и проверяем, чтобы не было совпадений, аналогично, с секретными ключами
         connection = sqlite3.connect('users.sqlite')
         cursor = connection.cursor()
-        logins = cursor.execute('SELECT login, secret FROM data_users').fetchall()
+        logins = cursor.execute('SELECT login FROM data_users').fetchall()
         secrets = cursor.execute('SELECT secret FROM data_users').fetchall()
+
         logins = [row[0] for row in logins]
         secrets = [row[0] for row in secrets]
 
         if self.login.text() in logins:
             self.text_error.setText('Этот логин уже занят, поменяйте на другой.')
+            connection.close()
             return
 
-        while True:
+        while True:  # проверка на уникальность секретного ключа
             secret = random.choices(
-                string.printable + 'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
+                string.digits + string.ascii_letters + string.punctuation +
+                'АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя'
                 , k=8)
             secret = ''.join(secret)
             if secret not in secrets:
                 break
 
-        #mime_data = QMimeData()
-        #mime_data.setText(secret)
-
-        #QApplication.clipboard().setMimeData(mime_data)
-
+        # фиксируем информацию о пользователе в бд
         cursor.execute(
-            f"""INSERT INTO data_users (login, password, secret, active) 
-            VALUES (?, ?, ?, (SELECT type FROM actives WHERE title == 'в главном окне'))""",
-            (self.login.text(), self.password_first.text(), secret)
+            f"""INSERT INTO data_users (login, password, secret, active, time_last_active) 
+            VALUES (?, ?, ?, (SELECT type FROM actives WHERE title == 'зарегистрировался'), ?)""",
+            (self.login.text(), self.password_first.text(), secret, datetime.datetime.now().
+             isoformat(sep=" ", timespec="seconds"))
         )
         connection.commit()
         connection.close()
 
-        self.player.play()
+        self.player.play()  # проигрываем музыку
         self.text_error.setText('Получилось!')
         self.text_error.setStyleSheet('color: orange;')
+
+        # Тут мы выводим QInputDialog с выключенном line_edit,
+        # чтобы пользователь имел возможность скопировать секретный ключ
+        # У пользователя будет кнопка копирования текста в буфер обмена и просто согласиться
+        # при любом раскладе откроется главное окно
         dialog = QInputDialog(self)
         dialog.setWindowTitle('Успешная регистрация!')
         dialog.setLabelText('Если забудете пароль, то можете его восстановить используя секретный ключ:')
-        dialog.setTextEchoMode(QLineEdit.EchoMode.Normal)
         dialog.setTextValue(secret)
         dialog.show()
 
@@ -106,15 +114,12 @@ class RegisterWindow(QWidget, QRegisterUI):
             QApplication.clipboard().setText(dialog.textValue())
             QMessageBox.information(self, 'Скопировано!', "Скопировано!")
 
-        from main_window import MainWindow
-        import main_window as mw
-        self.main = MainWindow(self.login.text())
+        self.main = main_window.MainWindow(self.login.text())
         self.main.show()
         self.close()
-        self.main.exit_on_db()
-        mw.cleanup()
 
     def go_login(self):
+        """Пользователя просто перекидывает на окно входа в приложение"""
         from login_window import LoginWindow
 
         self.login_window = LoginWindow()
@@ -134,4 +139,5 @@ if __name__ == '__main__':
     ex = RegisterWindow()
     ex.show()
 
+    app.aboutToQuit.connect(main_window.cleanup)  # при выходе запускается функция, которая чистит промежуточные файлы
     sys.exit(app.exec())

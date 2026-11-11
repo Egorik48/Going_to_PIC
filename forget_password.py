@@ -1,7 +1,6 @@
 import sqlite3
-import sys
 
-from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMessageBox
 
 from ui.QForgetUI import QForgetUI
 
@@ -15,21 +14,28 @@ class Forget(QWidget, QForgetUI):
         self.go_enter.clicked.connect(self.func_go_enter)
 
     def receive(self):
+        """функция ищет пользователя с секретным ключом, который написал пользователь, если нашёл,
+         то удаляет аккаунт, чтобы пользователь хорошо знал свой пароль в будущем"""
+        from register_dialog import RegisterWindow
+
         con = sqlite3.connect('users.sqlite')
         cur = con.cursor()
         user = cur.execute(f"""SELECT id FROM data_users WHERE secret = ?""",
-                           (self.lineEdit.text(), )).fetchone()
+                           (self.lineEdit.text(),)).fetchone()
         if not user:
             QMessageBox.warning(self, 'Ошибочка...', "У вас неправильный код, повторите ещё раз.")
+            con.close()
             return
-        cur.execute("""DELETE FROM data_users WHERE id = ?""", (user[0], ))
+
+        cur.execute("""DELETE
+                       FROM data_users
+                       WHERE id = ?""", (user[0],))
         QMessageBox.information(self, 'Не нужно было терять пароль', "Мы удалили ваш аккаунт,"
                                                                      " в следующий раз не теряйте пароль")
         con.commit()
         con.close()
-        from register_dialog import RegisterWindow
         self.reg = RegisterWindow()
-        self.reg.show()
+        self.reg.show()  # летим в окно регистрации
 
         self.close()
 
@@ -37,20 +43,6 @@ class Forget(QWidget, QForgetUI):
         from login_window import LoginWindow
 
         self.login_window = LoginWindow()
-        self.login_window.show()
+        self.login_window.show()  # летим в окно входа
 
         self.close()
-
-
-def except_hook(cls, exception, traceback):
-    sys.__excepthook__(cls, exception, traceback)
-
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    sys.excepthook = except_hook
-
-    ex = Forget()
-    ex.show()
-
-    sys.exit(app.exec())

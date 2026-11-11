@@ -438,6 +438,19 @@
     </attribute>
    </widget>
   </widget>
+  <widget class="QPushButton" name="btn_exit_from_account">
+   <property name="geometry">
+    <rect>
+     <x>1320</x>
+     <y>60</y>
+     <width>121</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>разлогиниться</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>
