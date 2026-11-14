@@ -20,20 +20,20 @@ class Forget(QWidget, QForgetUI):
 
         con = sqlite3.connect('users.sqlite')
         cur = con.cursor()
-        user = cur.execute(f"""SELECT id FROM data_users WHERE secret = ?""",
+        user = cur.execute("""SELECT id FROM data_users WHERE secret = ?""",
                            (self.lineEdit.text(),)).fetchone()
         if not user:
-            QMessageBox.warning(self, 'Ошибочка...', "У вас неправильный код, повторите ещё раз.")
             con.close()
+            QMessageBox.warning(self, 'Ошибочка...', "У вас неправильный код, повторите ещё раз.")
             return
 
         cur.execute("""DELETE
                        FROM data_users
                        WHERE id = ?""", (user[0],))
-        QMessageBox.information(self, 'Не нужно было терять пароль', "Мы удалили ваш аккаунт,"
-                                                                     " в следующий раз не теряйте пароль")
         con.commit()
         con.close()
+        QMessageBox.information(self, 'Не нужно было терять пароль', "Мы удалили ваш аккаунт,"
+                                                                     " в следующий раз не теряйте пароль")
         self.reg = RegisterWindow()
         self.reg.show()  # летим в окно регистрации
 

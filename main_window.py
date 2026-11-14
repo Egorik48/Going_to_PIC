@@ -1,5 +1,6 @@
 import datetime
 import random
+import shutil
 import sqlite3
 import string
 import os
@@ -12,7 +13,7 @@ import pathlib
 from PyQt6.QtCore import QMimeData
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QWidget, QFileDialog, QApplication, QMessageBox
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError, ImageOps
 
 import math
 
@@ -68,6 +69,7 @@ class MainWindow(QWidget, QMainUI):
             # если это фотка, то сжимаем её и передаём на общее обозрение, иначе у мы выводим img_for_show.png
             try:
                 img_for_show = Image.open(self.f_name)
+                img_for_show = ImageOps.exif_transpose(img_for_show) # чтобы не терять ориентацию изображения
                 img_for_show.thumbnail((731, 1000), Image.Resampling.LANCZOS)
                 img_for_show.save("thumbnail_pic.png")
                 self.textBrowser.setHtml(f"""<img src="thumbnail_pic.png"/>""")
@@ -298,20 +300,17 @@ class MainWindow(QWidget, QMainUI):
         fname, _ = QFileDialog.getSaveFileName(
             self,
             'Сохранить файл',
-            f'C://Users//user//Downloads//new_file.{type_file}',
+            str(pathlib.Path.home() / 'Downloads' / f'new_file.{type_file}'),
             f'Разрешение (*.{type_file})'
         )
 
         if fname:
-            dir, name = fname.rsplit('/', 1)
-            os.rename(f'rec_im.{type_file}', name)
             try:
-                file_from = pathlib.Path(name)
-                file_to = pathlib.Path(dir)
-                file_from.copy_into(file_to)  # копируем наш файл и путь, делаем копию и переносим в нужный путь
+                shutil.copy(f'rec_im.{type_file}', fname) # копируем наш временный файл,
+                # и делаем его копию, меняя его имя (по желанию) и перенося в нужный путь
                 self.text_result.setText('Сохранено!')
                 self.text_result.setStyleSheet('color: violet;')
-            except AttributeError as e:
+            except Exception as e:
                 QMessageBox.warning(
                     self, 'Ошибка сохранения', f'Не удалось сохранить файл: {e}'
                 )
