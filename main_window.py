@@ -93,7 +93,7 @@ class MainWindow(QWidget, QMainUI):
             return
 
         if not all(i in letters + string.digits for i in self.password.text()):
-            self.text_result.setText('В пароле должны быть только буквы и цифры!')
+            self.text_result.setText('В пароле должны быть только буквы или цифры!')
             self.text_result.setStyleSheet("color: red;")
             return
 
